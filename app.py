@@ -1106,7 +1106,8 @@ with chat_container:
                 if resp['processed'].get('conclusion_text'):
                     st.write(resp['processed']['conclusion_text'])
 
-    st.code(json.dumps(result["mongo_query"], indent=2))
+    
+st.code(json.dumps(result["mongo_query"], indent=2))
     
     # Show debug info if enabled
     if debug_mode:
