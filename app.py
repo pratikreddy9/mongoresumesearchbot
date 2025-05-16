@@ -95,22 +95,6 @@ def get_mongo_client() -> MongoClient:
     return MongoClient(**MONGO_CFG)
 
 # ── NORMALIZATION ──────────────────────────────────────────────────────
-# Core skill families with common variants to use in smart search
-CORE_SKILL_FAMILIES = {
-    "sql": ["sql", "mysql", "postgresql", "sql server", "oracle", "sqlite", "nosql", "database"],
-    "python": ["python", "django", "flask", "pandas", "numpy", "py", "pyspark"],
-    "javascript": ["javascript", "js", "node", "react", "vue", "angular", "typescript", "jquery"],
-    "java": ["java", "spring", "hibernate", "j2ee", "jakarta"],
-    "dotnet": ["c#", "csharp", ".net", "dotnet", "asp.net", "asp"],
-    "mobile": ["android", "ios", "swift", "flutter", "react native"],
-    "devops": ["aws", "azure", "gcp", "docker", "kubernetes", "terraform", "jenkins"],
-    "php": ["php", "laravel", "wordpress", "symfony", "cake"],
-    "ruby": ["ruby", "rails", "sinatra"],
-    "go": ["go", "golang"],
-    "data": ["hadoop", "spark", "tableau", "bi", "etl", "power bi", "looker"],
-    "testing": ["qa", "selenium", "test", "testing", "junit", "pytest"],
-}
-
 COUNTRY_EQUIV = {
     "indonesia": ["indonesia"],
     "vietnam": ["vietnam", "viet nam", "vn", "vietnamese"],
@@ -127,6 +111,17 @@ COUNTRY_EQUIV = {
     "hong kong": ["hong kong", "hong kong sar"],
     "thailand": ["thailand"],
     "united arab emirates": ["united arab emirates", "uae"],
+}
+
+# Define core skill families with common variants
+CORE_SKILL_FAMILIES = {
+    "sql": ["sql", "mysql", "postgresql", "sql server", "oracle", "sqlite", "nosql", "database"],
+    "python": ["python", "django", "flask", "pandas", "numpy", "py", "pyspark"],
+    "javascript": ["javascript", "js", "node", "react", "vue", "angular", "typescript", "jquery"],
+    "java": ["java", "spring", "hibernate", "j2ee", "jakarta"],
+    "dotnet": ["c#", "csharp", ".net", "dotnet", "asp.net", "asp"],
+    "mobile": ["android", "ios", "swift", "flutter", "react native"],
+    "devops": ["aws", "azure", "gcp", "docker", "kubernetes", "terraform", "jenkins"],
 }
 
 TITLE_VARIANTS = {
@@ -180,7 +175,333 @@ def score_resumes(query: str, resumes: List[Dict[str, Any]]) -> List[str]:
     content = json.loads(chat.choices[0].message.content)
     return content.get("top_resume_ids", [])
 
-# Add resumeId as data attribute (hidden but accessible)
+# ── TOOLS ─────────────────────────────────────────────────────────────
+@tool
+def query_db(
+    query: str,
+    country: Optional[str] = None,
+    min_experience_years: Optional[int] = None,
+    max_experience_years: Optional[int] = None,
+    job_titles: Optional[List[str]] = None,
+    skills: Optional[List[str]] = None,
+    top_k: int = TOP_K_DEFAULT,
+) -> Dict[str, Any]:
+    """
+    Filter MongoDB resumes with a smart hierarchical approach that:
+    1. Recognizes skill families (SQL, Python, etc.)
+    2. Requires ALL skill families to be present (AND logic between families)
+    3. Accepts ANY variant within each skill family (OR logic within families)
+    4. Dynamically handles unknown skills without needing exhaustive mappings
+    """
+    try:
+        # Start building our query
+        mongo_q: Dict[str, Any] = {}
+        and_conditions = []
+        
+        # Country filter (always use AND logic)
+        if country:
+            country_values = COUNTRY_EQUIV.get(country.strip().lower(), [country])
+            and_conditions.append({
+                "country": {"$in": country_values}
+            })
+        
+        # Job titles filter (OR logic between titles)
+        if job_titles and len(job_titles) > 0:
+            title_conditions = []
+            for title in job_titles:
+                if not title:
+                    continue
+                # Use exact match with variants from dictionary
+                expanded_titles = expand([title], TITLE_VARIANTS)
+                title_conditions.append({
+                    "jobExperiences.title": {"$in": expanded_titles}
+                })
+                # Also add case-insensitive regex for more flexible matching
+                title_conditions.append({
+                    "jobExperiences.title": {
+                        "$regex": f"\\b{re.escape(title.lower())}\\b",
+                        "$options": "i"
+                    }
+                })
+            
+            if title_conditions:
+                # At least one job title must match
+                and_conditions.append({"$or": title_conditions})
+        
+        # Experience filter (always use AND logic)
+        if isinstance(min_experience_years, int) and min_experience_years > 0:
+            and_conditions.append({
+                "$expr": {
+                    "$gte": [
+                        # Sum all job durations, handling null/missing values
+                        {"$sum": {
+                            "$map": {
+                                "input": {"$ifNull": ["$jobExperiences", []]},
+                                "as": "job",
+                                "in": {
+                                    "$convert": {
+                                        "input": {"$ifNull": ["$$job.duration", "0"]},
+                                        "to": "double",
+                                        "onError": 0,
+                                        "onNull": 0
+                                    }
+                                }
+                            }
+                        }},
+                        min_experience_years
+                    ]
+                }
+            })
+        
+        # Smart skill family matching - the core of the new approach
+        if skills and len(skills) > 0:
+            # Step 1: Group input skills by family
+            skill_families = {}
+            
+            for skill in skills:
+                if not skill:
+                    continue
+                
+                skill_lower = skill.lower().strip()
+                family_assigned = False
+                
+                # Try to assign to an existing family
+                for family_name, variants in CORE_SKILL_FAMILIES.items():
+                    # Check if this skill belongs to this family
+                    if any(variant in skill_lower or skill_lower in variant for variant in variants):
+                        if family_name not in skill_families:
+                            skill_families[family_name] = []
+                        skill_families[family_name].append(skill_lower)
+                        family_assigned = True
+                        break
+                
+                # If not assigned to any family, create a new family
+                if not family_assigned:
+                    # Use the skill itself as the family name
+                    if skill_lower not in skill_families:
+                        skill_families[skill_lower] = []
+                    skill_families[skill_lower].append(skill_lower)
+            
+            # Step 2: Create conditions for each skill family
+            for family_name, family_skills in skill_families.items():
+                # Get all possible variants for this family
+                family_variants = CORE_SKILL_FAMILIES.get(family_name, family_skills)
+                
+                # Include the original skills in the variants
+                all_variants = set(family_variants + family_skills)
+                
+                # Create a condition that matches ANY variant in this family
+                family_conditions = []
+                
+                # Add exact match conditions
+                family_conditions.append({
+                    "skills.skillName": {"$in": list(all_variants)}
+                })
+                family_conditions.append({
+                    "keywords": {"$in": list(all_variants)}
+                })
+                
+                # Add regex conditions for partial matching
+                for variant in all_variants:
+                    family_conditions.append({
+                        "skills.skillName": {
+                            "$regex": f"\\b{re.escape(variant)}\\b",
+                            "$options": "i"
+                        }
+                    })
+                    family_conditions.append({
+                        "keywords": {
+                            "$regex": f"\\b{re.escape(variant)}\\b",
+                            "$options": "i"
+                        }
+                    })
+                
+                # This family's condition: ANY variant must match
+                family_condition = {"$or": family_conditions}
+                
+                # Add this family's condition to the main AND conditions
+                and_conditions.append(family_condition)
+        
+        # Combine all AND conditions
+        if and_conditions:
+            mongo_q["$and"] = and_conditions
+        
+        # Print the final query for debugging
+        if debug_mode:
+            print(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
+            st.session_state.last_mongo_query = mongo_q  # Store for debugger view
+        
+        # Execute the query
+        with get_mongo_client() as client:
+            coll = client[DB_NAME][COLL_NAME]
+            candidates = list(coll.find(mongo_q, {"_id": 0, "embedding": 0}).limit(top_k))
+            
+            if debug_mode:
+                print(f"Found {len(candidates)} initial candidates")
+                
+                # Print sample skills from first few candidates for verification
+                for i, candidate in enumerate(candidates[:3]):
+                    print(f"Candidate {i+1}: {candidate.get('name', 'Unknown')}")
+                    skills_list = []
+                    for skill in candidate.get('skills', []):
+                        if isinstance(skill, dict):
+                            skills_list.append(skill.get('skillName', ''))
+                    print(f"  Skills: {', '.join(skills_list)}")
+                    print(f"  Keywords: {', '.join(candidate.get('keywords', []))}")
+        
+        # If no candidates found, return empty results
+        if not candidates:
+            return {
+                "message": "No resumes match ALL required criteria.",
+                "results_count": 0,
+                "results": [],
+                "completed_at": datetime.utcnow().isoformat(),
+            }
+        
+        # Use LLM to score and rank candidates 
+        best_ids = score_resumes(query, candidates)
+        best_resumes = [r for r in candidates if r["resumeId"] in best_ids]
+        
+        # Return results
+        return {
+            "message": f"Found {len(candidates)} candidates matching ALL criteria. Selected {len(best_resumes)} best matches.",
+            "results_count": len(best_resumes),
+            "results": best_resumes,
+            "completed_at": datetime.utcnow().isoformat(),
+        }
+    except PyMongoError as err:
+        return {"error": f"DB error: {str(err)}"}
+    except Exception as exc:
+        import traceback
+        return {"error": f"Query error: {str(exc)}", "traceback": traceback.format_exc()}
+
+def display_resume_grid(resumes, container=None):
+    """Display resumes in a 3x3 grid layout with styled cards."""
+    target = container if container else st
+    
+    if not resumes:
+        target.warning("No resumes found matching the criteria.")
+        return
+    
+    # Custom CSS for the resume cards
+    target.markdown("""
+    <style>
+    .resume-card {
+        border: 1px solid #e1e4e8;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 15px;
+        background-color: white;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+        height: 100%;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .resume-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .resume-name {
+        font-weight: bold;
+        font-size: 18px;
+        margin-bottom: 8px;
+        color: #24292e;
+    }
+    .resume-location {
+        color: #586069;
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+    .resume-contact {
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #444d56;
+    }
+    .resume-section-title {
+        font-weight: 600;
+        margin-top: 12px;
+        margin-bottom: 6px;
+        font-size: 15px;
+        color: #24292e;
+    }
+    .resume-experience {
+        font-size: 14px;
+        color: #444d56;
+        margin-bottom: 4px;
+    }
+    .skill-tag {
+        display: inline-block;
+        background-color: #f1f8ff;
+        color: #0366d6;
+        border-radius: 12px;
+        padding: 3px 10px;
+        margin: 3px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .keyword-tag {
+        display: inline-block;
+        background-color: #FFF8E1;
+        color: #FF8F00;
+        border-radius: 12px;
+        padding: 3px 10px;
+        margin: 3px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .job-matches {
+        margin-top: 8px;
+        padding: 4px 10px;
+        background-color: #E3F2FD;
+        border-radius: 4px;
+        display: inline-block;
+        font-size: 14px;
+        color: #0D47A1;
+    }
+    .resume-id {
+        font-size: 10px;
+        color: #6a737d;
+        margin-top: 8px;
+        word-break: break-all;
+    }
+    </style>
+    """, unsafe_allow_html=True)
+    
+    # Create a 3-column grid
+    num_resumes = len(resumes)
+    rows = (num_resumes + 2) // 3  # Ceiling division for number of rows
+    
+    for row in range(rows):
+        cols = target.columns(3)
+        for col in range(3):
+            idx = row * 3 + col
+            if idx < num_resumes:
+                resume = resumes[idx]
+                
+                # Extract resume data
+                name = resume.get("name", "Unknown")
+                email = resume.get("email", "")
+                phone = resume.get("contactNo", "")
+                location = resume.get("location", "")
+                resume_id = resume.get("resumeId", "")  # Extract resumeId for job matching
+                
+                # Get experience and skills
+                experience = resume.get("experience", [])
+                skills = resume.get("skills", [])
+                keywords = resume.get("keywords", [])  # Extract keywords
+                
+                # Get job matches if available
+                job_matches = resume.get("jobsMatched")
+                
+                with cols[col]:
+                    html = f"""
+                    <div class="resume-card">
+                        <div class="resume-name">{name}</div>
+                        <div class="resume-location">📍 {location}</div>
+                        <div class="resume-contact">📧 {email}</div>
+                        <div class="resume-contact">📱 {phone}</div>
+                    """
+                    
+                    # Add resumeId as data attribute (hidden but accessible)
                     if resume_id:
                         html = html.replace('<div class="resume-card">', f'<div class="resume-card" data-resume-id="{resume_id}">')
                     
@@ -280,6 +601,9 @@ if "processed_responses" not in st.session_state:
 if "job_match_data" not in st.session_state:
     st.session_state.job_match_data = {}
 
+if "last_mongo_query" not in st.session_state:
+    st.session_state.last_mongo_query = {}
+
 # Initialize or upgrade the agent
 tools = [query_db, send_email, get_job_match_counts, get_resume_id_by_name]
 if "agent_executor" not in st.session_state:
@@ -345,15 +669,6 @@ st.markdown("""
         padding: 15px;
         border-radius: 8px;
         margin-bottom: 20px;
-    }
-    .mongodb-query {
-        background-color: #f5f5f5;
-        border-left: 4px solid #13aa52;
-        padding: 10px;
-        margin: 10px 0;
-        font-family: monospace;
-        max-height: 300px;
-        overflow-y: auto;
     }
 </style>
 """, unsafe_allow_html=True)
@@ -437,6 +752,7 @@ if user_input:
             st.error(f"Error: {str(e)}")
             if debug_mode:
                 st.exception(e)
+
 
 # Display the complete chat history
 with chat_container:
@@ -602,13 +918,8 @@ with chat_container:
             st.subheader("Stored Resume IDs")
             st.json(st.session_state.resume_ids)
             
-            st.subheader("MongoDB Queries")
-            if hasattr(st.session_state, 'mongo_queries') and st.session_state.mongo_queries:
-                for i, (timestamp, query) in enumerate(st.session_state.mongo_queries.items()):
-                    st.markdown(f"**Query {i+1}** - {timestamp}")
-                    st.markdown(f'<div class="mongodb-query">{json.dumps(query, indent=2)}</div>', unsafe_allow_html=True)
-            else:
-                st.info("No MongoDB queries recorded yet.")
+            st.subheader("Last MongoDB Query")
+            st.json(st.session_state.last_mongo_query)
             
             st.subheader("Processed Responses")
             for key, value in st.session_state.processed_responses.items():
@@ -622,32 +933,3 @@ with chat_container:
             
             st.subheader("Job Match Data")
             st.json(st.session_state.job_match_data)
-
-# Add extra debug mode functionality to record MongoDB queries
-if 'mongo_queries' not in st.session_state:
-    st.session_state.mongo_queries = {}
-
-# Original query_db function uses debug_mode to print MongoDB queries
-# The following hook intercepts those queries and stores them in session state
-def debug_print_hook(msg):
-    """Hook to capture debug print messages for MongoDB queries"""
-    if isinstance(msg, str) and msg.startswith("MongoDB Query:"):
-        try:
-            # Extract the JSON query
-            query_str = msg.replace("MongoDB Query:", "").strip()
-            query = json.loads(query_str)
-            
-            # Store in session state with timestamp
-            timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
-            st.session_state.mongo_queries[timestamp] = query
-        except:
-            pass
-    # Always print the original message
-    print(msg)
-
-# Replace the built-in print with our hook when debug_mode is enabled
-if debug_mode:
-    import builtins
-    original_print = builtins.print
-    builtins.print = debug_print_hook
-
