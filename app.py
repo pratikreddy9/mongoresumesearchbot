@@ -170,7 +170,6 @@ def score_resumes(query: str, resumes: List[Dict[str, Any]]) -> List[str]:
 
 # ── TOOLS ─────────────────────────────────────────────────────────────
 @tool
-@tool
 def query_db(
     query: str,
     country: Optional[str] = None,
