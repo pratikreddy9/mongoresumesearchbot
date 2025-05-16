@@ -165,7 +165,7 @@ def score_resumes(query: str, resumes: List[Dict[str, Any]]) -> List[str]:
 # ── TOOLS ─────────────────────────────────────────────────────────────
 @tool
 def query_db(
-    query: str,
+    query: str = "",                       # ← give it a default so it’s no longer “required”
     country: Optional[str] = None,
     min_experience_years: Optional[int] = None,
     max_experience_years: Optional[int] = None,
@@ -175,9 +175,13 @@ def query_db(
 ) -> Dict[str, Any]:
     """
     Filter MongoDB resumes.  
-    **Loose OR inside each synonym bucket, strict AND across different skills.**
+    Loose OR inside each synonym bucket, strict AND across different skills.
     """
     try:
+        if not query:
+            # fall back to a simple human-readable query so the LLM re-ranker has something
+            query = " / ".join(skills or []) or "resume search"
+
         mongo_q: Dict[str, Any] = {}
         and_clauses: List[Dict[str, Any]] = []
 
