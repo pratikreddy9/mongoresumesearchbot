@@ -168,7 +168,7 @@ def score_resumes(query: str, resumes: List[Dict[str, Any]]) -> List[str]:
     content = json.loads(chat.choices[0].message.content)
     return content.get("top_resume_ids", [])
 
-st.code(json.dumps(result["mongo_query"], indent=2))
+
 
 # ── TOOLS ─────────────────────────────────────────────────────────────
 @tool
@@ -1105,6 +1105,8 @@ with chat_container:
                 # Display conclusion if available
                 if resp['processed'].get('conclusion_text'):
                     st.write(resp['processed']['conclusion_text'])
+
+    st.code(json.dumps(result["mongo_query"], indent=2))
     
     # Show debug info if enabled
     if debug_mode:
