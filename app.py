@@ -168,6 +168,8 @@ def score_resumes(query: str, resumes: List[Dict[str, Any]]) -> List[str]:
     content = json.loads(chat.choices[0].message.content)
     return content.get("top_resume_ids", [])
 
+st.code(json.dumps(result["mongo_query"], indent=2))
+
 # ── TOOLS ─────────────────────────────────────────────────────────────
 @tool
 def query_db(
