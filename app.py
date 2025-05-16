@@ -1130,5 +1130,3 @@ with chat_container:
             
             st.subheader("Job Match Data")
             st.json(st.session_state.job_match_data)
-
-st.code(json.dumps(result["mongo_query"], indent=2))
