@@ -1107,7 +1107,7 @@ with chat_container:
                     st.write(resp['processed']['conclusion_text'])
 
     
-st.code(json.dumps(result["mongo_query"], indent=2))
+
     
     # Show debug info if enabled
     if debug_mode:
@@ -1130,3 +1130,5 @@ st.code(json.dumps(result["mongo_query"], indent=2))
             
             st.subheader("Job Match Data")
             st.json(st.session_state.job_match_data)
+
+st.code(json.dumps(result["mongo_query"], indent=2))
