@@ -1,0 +1,7 @@
+streamlit
+pymongo
+openai
+langchain           # core framework
+langchain-openai   # OpenAI provider
+langchain-community # generic tool + loader set
+pydantic              # for the tool schema
