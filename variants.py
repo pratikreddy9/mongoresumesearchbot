@@ -1,11 +1,6 @@
-"""
-ZappBot variants module
-Contains lookup dictionaries for standardizing country names, skills, job titles
-"""
-
 from typing import List, Dict
 
-# Country name standardization
+# Normalization dictionaries for country, skill, and job title variants
 COUNTRY_EQUIV = {
     "indonesia": ["indonesia"],
     "vietnam": ["vietnam", "viet nam", "vn", "vietnamese"],
@@ -24,7 +19,6 @@ COUNTRY_EQUIV = {
     "united arab emirates": ["united arab emirates", "uae"],
 }
 
-# Skill name standardization
 SKILL_VARIANTS = {
     "sql": ["sql", "mysql", "microsoft sql server"],
     "javascript": ["javascript", "js", "java script"],
@@ -32,7 +26,6 @@ SKILL_VARIANTS = {
     "html": ["html", "hypertext markup language"],
 }
 
-# Job title standardization
 TITLE_VARIANTS = {
     "software developer": [
         "software developer",
@@ -55,14 +48,14 @@ TITLE_VARIANTS = {
 
 def expand(values: List[str], table: Dict[str, List[str]]) -> List[str]:
     """
-    Expand a list of values to include their variants from a lookup table.
+    Expands a list of values by adding normalized variants from the given lookup table.
     
     Args:
-        values: List of values to expand
-        table: Dictionary mapping canonical values to lists of variants
+        values: List of string values to expand
+        table: Dictionary mapping normalized values to lists of variants
         
     Returns:
-        List of expanded values including the original values
+        An expanded list of values including all variants
     """
     out = set()
     for v in values:
