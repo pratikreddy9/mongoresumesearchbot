@@ -147,8 +147,17 @@ def query_db(
             if debug_mode:
                 print(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
             
-            # Get a larger initial candidate pool to let the LLM select from
+            # Get the candidate pool from MongoDB
             candidates = list(coll.find(mongo_q, {"_id": 0, "embedding": 0}).limit(50))
+        
+        # Simply return the candidates from MongoDB without LLM scoring
+        # The downstream agent will handle the LLM-based ranking
+        return {
+            "message": f"Found {len(candidates)} resumes matching the criteria.",
+            "results_count": len(candidates),
+            "results": candidates,
+            "completed_at": datetime.utcnow().isoformat(),
+        }
         
         # STAGE 2: Use LLM to strictly filter and score candidates
         # This ensures candidates meet ALL criteria, not just some
