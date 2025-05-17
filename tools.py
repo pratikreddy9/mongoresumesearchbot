@@ -19,7 +19,7 @@ OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 SMTP_HOST, SMTP_PORT = "smtp.gmail.com", 465
 SMTP_USER, SMTP_PASS = st.secrets["SMTP_USER"], st.secrets["SMTP_PASS"]
 EVAL_MODEL_NAME = "gpt-4o" 
-TOP_K_DEFAULT = 50
+TOP_K_DEFAULT = 100
 DB_NAME = "resumes_database"
 COLL_NAME = "resumes"
 
@@ -41,33 +41,110 @@ def query_db(
         # STAGE 1: Get initial candidates from MongoDB with basic filtering
         # This casts a wider net to find potential matches
         mongo_q: Dict[str, Any] = {}
+        and_conditions = []
         
         # Country filter (if provided)
         if country:
             mongo_q["country"] = {"$in": COUNTRY_EQUIV.get(country.strip().lower(), [country])}
         
-        # Skills filter - using OR logic to cast a wider net
+        # Skills filter - using AND logic between different skills, but OR between variants
         if skills and len(skills) > 0:
-            expanded_skills = expand(skills, SKILL_VARIANTS)
-            mongo_q["$or"] = [
-                {"skills.skillName": {"$in": expanded_skills}},
-                {"keywords": {"$in": expanded_skills}}
-            ]
+            skill_conditions = []
+            for skill in skills:
+                # Expand variants for this specific skill
+                expanded = expand([skill], SKILL_VARIANTS)
+                # Create OR condition between skill name and keywords for this skill and its variants
+                skill_conditions.append({
+                    "$or": [
+                        {"skills.skillName": {"$in": expanded}},
+                        {"keywords": {"$in": expanded}}
+                    ]
+                })
+            # Add all skill conditions with AND logic
+            and_conditions.extend(skill_conditions)
         
-        # Job titles filter - using OR logic with the initial MongoDB query
+        # Job titles filter - using AND logic between different titles, but OR between variants
         if job_titles and len(job_titles) > 0:
-            expanded_titles = expand(job_titles, TITLE_VARIANTS)
-            if "$or" in mongo_q:
-                # If we already have skills in $or, add job titles as another condition
-                mongo_q["$or"].append({"jobExperiences.title": {"$in": expanded_titles}})
-            else:
-                # Otherwise create a new $or for job titles
-                mongo_q["$or"] = [{"jobExperiences.title": {"$in": expanded_titles}}]
+            title_conditions = []
+            for title in job_titles:
+                # Expand variants for this specific title
+                expanded = expand([title], TITLE_VARIANTS)
+                # Create OR condition for this title and its variants
+                title_conditions.append({
+                    "jobExperiences.title": {"$in": expanded}
+                })
+            # Add all title conditions with AND logic
+            and_conditions.extend(title_conditions)
+        
+        # Experience filter - using totalExperience field if available, otherwise sum job durations
+        # This handles both cases where totalExperience is available or we need to calculate from durations
+        if isinstance(min_experience_years, (int, float)) and min_experience_years > 0:
+            experience_condition = {
+                "$or": [
+                    # First try using the totalExperience field if it exists and is not null
+                    {"totalExperience": {"$gte": min_experience_years}},
+                    # Fallback: use $expr to calculate total from job durations 
+                    {"$expr": {
+                        "$gte": [
+                            {"$sum": {
+                                "$map": {
+                                    "input": "$jobExperiences",
+                                    "as": "job",
+                                    "in": {
+                                        "$convert": {
+                                            "input": "$job.duration",
+                                            "to": "double",
+                                            "onError": 0,
+                                            "onNull": 0
+                                        }
+                                    }
+                                }
+                            }},
+                            min_experience_years
+                        ]
+                    }}
+                ]
+            }
+            and_conditions.append(experience_condition)
+        
+        if isinstance(max_experience_years, (int, float)) and max_experience_years > 0:
+            experience_condition = {
+                "$or": [
+                    # First try using the totalExperience field if it exists and is not null
+                    {"totalExperience": {"$lte": max_experience_years}},
+                    # Fallback: use $expr to calculate total from job durations
+                    {"$expr": {
+                        "$lte": [
+                            {"$sum": {
+                                "$map": {
+                                    "input": "$jobExperiences",
+                                    "as": "job",
+                                    "in": {
+                                        "$convert": {
+                                            "input": "$job.duration",
+                                            "to": "double",
+                                            "onError": 0,
+                                            "onNull": 0
+                                        }
+                                    }
+                                }
+                            }},
+                            max_experience_years
+                        ]
+                    }}
+                ]
+            }
+            and_conditions.append(experience_condition)
+        
+        # Add the AND conditions to the query if there are any
+        if and_conditions:
+            mongo_q["$and"] = and_conditions
         
         # Get initial candidates from MongoDB
         with get_mongo_client() as client:
             coll = client[DB_NAME][COLL_NAME]
-            if 'debug_mode' in globals() and debug_mode:
+            debug_mode = getattr(st.session_state, 'debug_mode', False)
+            if debug_mode:
                 print(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
             
             # Get a larger initial candidate pool to let the LLM select from
