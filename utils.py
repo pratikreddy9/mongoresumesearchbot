@@ -1,27 +1,20 @@
-"""
-ZappBot utils module
-Contains helper functions for email, MongoDB, LLM, and parsing
-"""
-
-import re
-import json
-import hashlib
+import os, json, re, hashlib
 from datetime import datetime
 from typing import List, Dict, Any, Optional
-
-import smtplib
-import ssl
-from email.mime.text import MIMEText
-from email.mime.multipart import MIMEMultipart
-
 import streamlit as st
 from pymongo import MongoClient
 from pymongo.errors import PyMongoError
 import openai
 
-# MongoDB connection
+# ── CONSTANTS ──────────────────────────────────────────────────────────
+DB_NAME = "resumes_database"
+COLL_NAME = "resumes"
+OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
+EVAL_MODEL_NAME = "gpt-4o"
+
+# ── MONGODB CONNECTION ───────────────────────────────────────────────────
 def get_mongo_client() -> MongoClient:
-    """Get MongoDB client instance from configuration in st.secrets"""
+    """Get a MongoDB client connection using credentials from streamlit secrets."""
     mongo_cfg = {
         "host": "notify.pesuacademy.com",
         "port": 27017,
@@ -31,7 +24,34 @@ def get_mongo_client() -> MongoClient:
     }
     return MongoClient(**mongo_cfg)
 
-# Email formatting
+# ── LLM‑BASED RESUME SCORER ────────────────────────────────────────────
+_openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
+
+def score_resumes(query: str, resumes: List[Dict[str, Any]]) -> List[str]:
+    """
+    Score resumes against a query using the LLM and return the top resume IDs.
+    
+    Args:
+        query: The user's query string
+        resumes: List of resume dictionaries to score
+        
+    Returns:
+        List of top resume IDs selected by the LLM
+    """
+    from prompts import EVALUATOR_PROMPT
+    
+    chat = _openai_client.chat.completions.create(
+        model=EVAL_MODEL_NAME,
+        response_format={"type": "json_object"},
+        messages=[
+            {"role": "system", "content": EVALUATOR_PROMPT},
+            {"role": "user", "content": f"Query: {query}\n\nResumes: {json.dumps(resumes)}"},
+        ],
+    )
+    content = json.loads(chat.choices[0].message.content)
+    return content.get("top_resume_ids", [])
+
+# ── EMAIL FORMATTER ───────────────────────────────────────────────────
 def reformat_email_body(llm_output, intro="", conclusion=""):
     """
     Formats LLM output (list of dicts, dict, or string) as neat plain text for emails.
@@ -41,8 +61,10 @@ def reformat_email_body(llm_output, intro="", conclusion=""):
         intro, conclusion: optional strings to prepend/append
         
     Returns:
-        Formatted email body as string
+        Formatted plain text string suitable for email
     """
+    import json
+
     lines = []
     # Try parsing JSON if LLM gave a JSON string
     if isinstance(llm_output, str):
@@ -81,45 +103,16 @@ def reformat_email_body(llm_output, intro="", conclusion=""):
 
     return "\n".join(lines)
 
-# LLM-based scoring
-def score_resumes(query: str, resumes: List[Dict[str, Any]], model_name: str, openai_api_key: str) -> List[str]:
-    """
-    Use LLM to score and rank resumes based on query.
-    
-    Args:
-        query: Query string to match against resumes
-        resumes: List of resume dictionaries to score
-        model_name: OpenAI model name to use
-        openai_api_key: OpenAI API key
-        
-    Returns:
-        List of resumeIds ranked by relevance
-    """
-    from prompts import EVALUATOR_PROMPT
-    
-    openai_client = openai.OpenAI(api_key=openai_api_key)
-    
-    chat = openai_client.chat.completions.create(
-        model=model_name,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": EVALUATOR_PROMPT},
-            {"role": "user", "content": f"Query: {query}\n\nResumes: {json.dumps(resumes)}"},
-        ],
-    )
-    content = json.loads(chat.choices[0].message.content)
-    return content.get("top_resume_ids", [])
-
-# Resume response parsing
+# ── PARSE AND PROCESS RESPONSE ────────────────────────────────────────
 def extract_resume_ids_from_response(response_text):
     """
     Extract resumeIds from the HTML comment in the response.
     
     Args:
-        response_text: Text of response to extract from
+        response_text: The full response text to extract from
         
     Returns:
-        Dictionary mapping candidate names to resumeIds
+        Dictionary mapping resume names to IDs
     """
     meta_pattern = r'<!--RESUME_META:(.*?)-->'
     meta_match = re.search(meta_pattern, response_text)
@@ -133,13 +126,13 @@ def extract_resume_ids_from_response(response_text):
 
 def process_response(text):
     """
-    Process the response text to extract intro, resumes, and conclusion.
+    Process the response text to extract resume data and sections.
     
     Args:
-        text: Text of response to process
+        text: The full response text to process
         
     Returns:
-        Dictionary with extracted components
+        Dictionary with processed response sections and data
     """
     # First, check if this is a resume-listing response
     if "Here are some" in text and ("Experience:" in text or "experience:" in text) and ("Skills:" in text or "skills:" in text):
@@ -204,21 +197,19 @@ def process_response(text):
             "full_text": text
         }
 
-def attach_hidden_resume_ids(resume_list: List[Dict[str, Any]], db_name="resumes_database", coll_name="resumes") -> None:
+def attach_hidden_resume_ids(resume_list: List[Dict[str, Any]]) -> None:
     """
     For every resume in resume_list that lacks a 'resumeId', look it up by (email, contactNo)
-    and add it. Also fetches keywords.
+    and add it. Also fetches keywords. Nothing is displayed to the user.
     
     Args:
-        resume_list: List of resume dictionaries to enhance
-        db_name: MongoDB database name
-        coll_name: MongoDB collection name
+        resume_list: List of resume dictionaries to update with IDs
     """
     if not resume_list:
         return
     
     with get_mongo_client() as client:
-        coll = client[db_name][coll_name]
+        coll = client[DB_NAME][COLL_NAME]
         for res in resume_list:
             email = res.get("email")
             phone = res.get("contactNo")
