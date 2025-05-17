@@ -1,59 +1,31 @@
-"""
-ZappBot tools module - Contains all LangChain tool functions.
-"""
-
+import os
 from typing import List, Optional, Dict, Any
-from datetime import datetime
-import json
 
 import streamlit as st
+import smtplib, ssl
+from email.mime.text import MIMEText
+from email.mime.multipart import MIMEMultipart
+from datetime import datetime
 from langchain_core.tools import tool
 from pymongo.errors import PyMongoError
 import openai
+import json
 
-from utils import get_mongo_client, reformat_email_body
-from variants import COUNTRY_EQUIV, SKILL_VARIANTS, TITLE_VARIANTS, expand
+from utils import get_mongo_client, score_resumes
+from variants import expand, COUNTRY_EQUIV, SKILL_VARIANTS, TITLE_VARIANTS
 
-# ── CONFIG ─────────────────────────────────────────────────────────────
+# Constants
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
-# SMTP constants from secrets
 SMTP_HOST, SMTP_PORT = "smtp.gmail.com", 465
 SMTP_USER, SMTP_PASS = st.secrets["SMTP_USER"], st.secrets["SMTP_PASS"]
-
-# Database configs
+EVAL_MODEL_NAME = "gpt-4o" 
 TOP_K_DEFAULT = 100
 DB_NAME = "resumes_database"
 COLL_NAME = "resumes"
-EVAL_MODEL_NAME = "gpt-4o"
 
-# Initialize OpenAI client for evaluations
+# Initialize OpenAI client
 _openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
-# ── LLM‑BASED RESUME SCORER ────────────────────────────────────────────
-EVALUATOR_PROMPT = """
-You are a resume scoring assistant. Return only the 10 best resumeIds. with all the matching according to the query.
-
-JSON format:
-{
-  "top_resume_ids": [...],
-  "completed_at": "ISO"
-}
-"""
-
-def score_resumes(query: str, resumes: List[Dict[str, Any]]) -> List[str]:
-    """Uses LLM to score and rank candidate resumes based on the query."""
-    chat = _openai_client.chat.completions.create(
-        model=EVAL_MODEL_NAME,
-        response_format={"type": "json_object"},
-        messages=[
-            {"role": "system", "content": EVALUATOR_PROMPT},
-            {"role": "user", "content": f"Query: {query}\n\nResumes: {json.dumps(resumes)}"},
-        ],
-    )
-    content = json.loads(chat.choices[0].message.content)
-    return content.get("top_resume_ids", [])
-
-# ── TOOLS ─────────────────────────────────────────────────────────────
 @tool
 def query_db(
     query: str,
@@ -92,33 +64,10 @@ def query_db(
                 # Otherwise create a new $or for job titles
                 mongo_q["$or"] = [{"jobExperiences.title": {"$in": expanded_titles}}]
         
-        # Experience years filter
-        and_clauses = []
-        if isinstance(min_experience_years, int) and min_experience_years > 0:
-            and_clauses.append(
-                {
-                    "$expr": {
-                        "$gte": [
-                            # Use $convert with output as double to handle decimal values
-                            {"$convert": {
-                                "input": {"$ifNull": [{"$first": "$jobExperiences.duration"}, "0"]},
-                                "to": "double",
-                                "onError": 0,
-                                "onNull": 0
-                            }},
-                            min_experience_years,
-                        ]
-                    }
-                }
-            )
-        if and_clauses:
-            mongo_q["$and"] = and_clauses
-        
         # Get initial candidates from MongoDB
         with get_mongo_client() as client:
             coll = client[DB_NAME][COLL_NAME]
-            debug_mode = st.session_state.get("debug_mode", False)
-            if debug_mode:
+            if 'debug_mode' in globals() and debug_mode:
                 print(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
             
             # Get a larger initial candidate pool to let the LLM select from
@@ -202,10 +151,6 @@ def query_db(
 def send_email(to: str, subject: str, body: str) -> str:
     """Send a plain text email using SMTP_USER / SMTP_PASS from secrets.toml."""
     try:
-        import smtplib, ssl
-        from email.mime.text import MIMEText
-        from email.mime.multipart import MIMEMultipart
-        
         msg = MIMEMultipart("alternative")
         msg["Subject"], msg["From"], msg["To"] = subject, SMTP_USER, to
         # Plain text email only
@@ -217,6 +162,7 @@ def send_email(to: str, subject: str, body: str) -> str:
         return "Email sent!"
     except Exception as e:
         return f"Email failed: {e}"
+
 
 @tool
 def get_job_match_counts(resume_ids: List[str]) -> Dict[str, Any]:
@@ -244,6 +190,7 @@ def get_job_match_counts(resume_ids: List[str]) -> Dict[str, Any]:
         return {"error": f"DB error: {str(err)}"}
     except Exception as exc:
         return {"error": str(exc)}
+
 
 @tool
 def get_resume_id_by_name(name: str) -> Dict[str, Any]:
