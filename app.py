@@ -3,35 +3,29 @@ ZappBot: Resume‑filtering chatbot with optimized display + email sender + job 
 LangChain 0.3.25 • OpenAI 1.78.1 • Streamlit 1.34+
 """
 
-import os
-import json
-import re
-import hashlib
+import os, json, re
 from datetime import datetime
 
 import streamlit as st
 from langchain_openai import ChatOpenAI
-from langchain_core.tools import tool
 from langchain.agents import create_openai_tools_agent, AgentExecutor
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.memory import ConversationBufferMemory
 
-# Import custom modules
+# Import modular components
 from prompts import agent_prompt
-from tools import query_db, send_email, get_job_match_counts, get_resume_id_by_name
+from design import display_resume_grid
+from variants import expand
 from utils import (
+    get_mongo_client, 
     extract_resume_ids_from_response, 
     process_response, 
-    attach_hidden_resume_ids, 
-    reformat_email_body,
-    get_mongo_client
+    attach_hidden_resume_ids
 )
-from design import display_resume_grid
+from tools import query_db, send_email, get_job_match_counts, get_resume_id_by_name
 
 # ── CONFIG ─────────────────────────────────────────────────────────────
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 MODEL_NAME = "gpt-4o"
-EVAL_MODEL_NAME = "gpt-4o"
 TOP_K_DEFAULT = 100
 DB_NAME = "resumes_database"
 COLL_NAME = "resumes"
@@ -39,10 +33,46 @@ COLL_NAME = "resumes"
 # ── AGENT + MEMORY ─────────────────────────────────────────────────────
 llm = ChatOpenAI(model=MODEL_NAME, api_key=OPENAI_API_KEY, temperature=0)
 
+# Initialize session state variables
+if "memory" not in st.session_state:
+    st.session_state.memory = ConversationBufferMemory(
+        memory_key="chat_history", return_messages=True
+    )
+
+if "resume_ids" not in st.session_state:
+    st.session_state.resume_ids = {}
+
+if "processed_responses" not in st.session_state:
+    st.session_state.processed_responses = {}
+
+if "job_match_data" not in st.session_state:
+    st.session_state.job_match_data = {}
+
+# Initialize or upgrade the agent
+tools = [query_db, send_email, get_job_match_counts, get_resume_id_by_name]
+if "agent_executor" not in st.session_state:
+    agent = create_openai_tools_agent(llm, tools, agent_prompt)
+    st.session_state.agent_executor = AgentExecutor(
+        agent=agent, 
+        tools=tools,
+        memory=st.session_state.memory, 
+        verbose=True
+    )
+    st.session_state.agent_upgraded = True
+elif not st.session_state.get("agent_upgraded", False):
+    upgraded_agent = create_openai_tools_agent(llm, tools, agent_prompt)
+    st.session_state.agent_executor = AgentExecutor(
+        agent=upgraded_agent,
+        tools=tools,
+        memory=st.session_state.memory,
+        verbose=True,
+    )
+    st.session_state.agent_upgraded = True
+
 # ── STREAMLIT UI ───────────────────────────────────────────────────────
 st.set_page_config(page_title="ZappBot", layout="wide")
 
-# Apply custom CSS from design module
+# Apply custom CSS
 st.markdown("""
 <style>
     .stApp {
@@ -86,42 +116,6 @@ st.markdown("""
     }
 </style>
 """, unsafe_allow_html=True)
-
-# Initialize session state variables
-if "memory" not in st.session_state:
-    st.session_state.memory = ConversationBufferMemory(
-        memory_key="chat_history", return_messages=True
-    )
-
-if "resume_ids" not in st.session_state:
-    st.session_state.resume_ids = {}
-
-if "processed_responses" not in st.session_state:
-    st.session_state.processed_responses = {}
-
-if "job_match_data" not in st.session_state:
-    st.session_state.job_match_data = {}
-
-# Initialize or upgrade the agent
-tools = [query_db, send_email, get_job_match_counts, get_resume_id_by_name]
-if "agent_executor" not in st.session_state:
-    agent = create_openai_tools_agent(llm, tools, agent_prompt)
-    st.session_state.agent_executor = AgentExecutor(
-        agent=agent, 
-        tools=tools,
-        memory=st.session_state.memory, 
-        verbose=True
-    )
-    st.session_state.agent_upgraded = True
-elif not st.session_state.get("agent_upgraded", False):
-    upgraded_agent = create_openai_tools_agent(llm, tools, agent_prompt)
-    st.session_state.agent_executor = AgentExecutor(
-        agent=upgraded_agent,
-        tools=tools,
-        memory=st.session_state.memory,
-        verbose=True,
-    )
-    st.session_state.agent_upgraded = True
 
 # Header
 st.markdown('<div class="header-container"><div class="header-emoji">⚡</div><div class="header-text">ZappBot</div></div>', unsafe_allow_html=True)
@@ -303,7 +297,9 @@ with chat_container:
                     if resp['processed']['resumes']:
                         if st.button(f"📧 Email Results", key=f"email_btn_{i}"):
                             try:
-                                # Universal formatted plain text for email (uses LLM/chat output)
+                                # Format email body using reformat_email_body from utils.py
+                                from utils import reformat_email_body
+                                
                                 plain_text_body = reformat_email_body(
                                     llm_output=resp['processed']['resumes'],
                                     intro=resp['processed']['intro_text'],
@@ -380,7 +376,3 @@ with chat_container:
             
             st.subheader("Job Match Data")
             st.json(st.session_state.job_match_data)
-
-if __name__ == "__main__":
-    # This is the main entry point for the app
-    pass
