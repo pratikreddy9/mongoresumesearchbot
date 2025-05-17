@@ -36,10 +36,23 @@ def query_db(
     skills: Optional[List[str]] = None,
     top_k: int = TOP_K_DEFAULT,
 ) -> Dict[str, Any]:
-    """Filter MongoDB resumes and return top matches using a two-stage process."""
+    """
+    Filter MongoDB resumes based on specified criteria.
+    
+    Args:
+        query: The original user query string
+        country: Optional country to filter resumes by
+        min_experience_years: Optional minimum years of experience required
+        max_experience_years: Optional maximum years of experience
+        job_titles: Optional list of job titles to match
+        skills: Optional list of skills to match
+        top_k: Maximum number of results to return (default: 100)
+        
+    Returns:
+        Dictionary containing matching resumes and metadata
+    """
     try:
-        # STAGE 1: Get initial candidates from MongoDB with basic filtering
-        # This casts a wider net to find potential matches
+        # Build the MongoDB query with AND/OR logic as specified
         mongo_q: Dict[str, Any] = {}
         and_conditions = []
         
@@ -77,12 +90,13 @@ def query_db(
             and_conditions.extend(title_conditions)
         
         # Experience filter - using totalExperience field if available, otherwise sum job durations
-        # This handles both cases where totalExperience is available or we need to calculate from durations
-        if isinstance(min_experience_years, (int, float)) and min_experience_years > 0:
+        if min_experience_years is not None:
+            # Convert to float to handle decimal values like 0.5 years of experience
+            min_exp = float(min_experience_years)
             experience_condition = {
                 "$or": [
                     # First try using the totalExperience field if it exists and is not null
-                    {"totalExperience": {"$gte": min_experience_years}},
+                    {"totalExperience": {"$gte": min_exp}},
                     # Fallback: use $expr to calculate total from job durations 
                     {"$expr": {
                         "$gte": [
@@ -92,7 +106,7 @@ def query_db(
                                     "as": "job",
                                     "in": {
                                         "$convert": {
-                                            "input": "$job.duration",
+                                            "input": "$$job.duration",
                                             "to": "double",
                                             "onError": 0,
                                             "onNull": 0
@@ -100,18 +114,20 @@ def query_db(
                                     }
                                 }
                             }},
-                            min_experience_years
+                            min_exp
                         ]
                     }}
                 ]
             }
             and_conditions.append(experience_condition)
         
-        if isinstance(max_experience_years, (int, float)) and max_experience_years > 0:
+        if max_experience_years is not None:
+            # Convert to float to handle decimal values
+            max_exp = float(max_experience_years)
             experience_condition = {
                 "$or": [
                     # First try using the totalExperience field if it exists and is not null
-                    {"totalExperience": {"$lte": max_experience_years}},
+                    {"totalExperience": {"$lte": max_exp}},
                     # Fallback: use $expr to calculate total from job durations
                     {"$expr": {
                         "$lte": [
@@ -121,7 +137,7 @@ def query_db(
                                     "as": "job",
                                     "in": {
                                         "$convert": {
-                                            "input": "$job.duration",
+                                            "input": "$$job.duration",
                                             "to": "double",
                                             "onError": 0,
                                             "onNull": 0
@@ -129,7 +145,7 @@ def query_db(
                                     }
                                 }
                             }},
-                            max_experience_years
+                            max_exp
                         ]
                     }}
                 ]
@@ -140,97 +156,28 @@ def query_db(
         if and_conditions:
             mongo_q["$and"] = and_conditions
         
-        # Get initial candidates from MongoDB
+        # Execute the MongoDB query
         with get_mongo_client() as client:
             coll = client[DB_NAME][COLL_NAME]
             debug_mode = getattr(st.session_state, 'debug_mode', False)
             if debug_mode:
                 print(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
             
-            # Get the candidate pool from MongoDB
-            candidates = list(coll.find(mongo_q, {"_id": 0, "embedding": 0}).limit(50))
+            # Get the candidate pool from MongoDB using top_k to limit results
+            candidates = list(coll.find(mongo_q, {"_id": 0, "embedding": 0}).limit(top_k))
         
-        # Simply return the candidates from MongoDB without LLM scoring
-        # The downstream agent will handle the LLM-based ranking
+        # Return the results
         return {
             "message": f"Found {len(candidates)} resumes matching the criteria.",
             "results_count": len(candidates),
             "results": candidates,
             "completed_at": datetime.utcnow().isoformat(),
         }
-        
-        # STAGE 2: Use LLM to strictly filter and score candidates
-        # This ensures candidates meet ALL criteria, not just some
-        
-        # If no candidates found in initial search, return empty results
-        if not candidates:
-            return {
-                "message": "No resumes match the criteria.",
-                "results_count": 0,
-                "results": [],
-                "completed_at": datetime.utcnow().isoformat(),
-            }
-        
-        # Create a prompt that strictly enforces ALL criteria
-        system_prompt = f"""
-        You are a strict resume evaluator. Your task is to identify candidates 
-        that meet ALL of the following criteria from the query:
-        
-        QUERY: {query}
-        
-        Criteria to enforce STRICTLY:
-        1. Job Title: Must have held a job title of "software developer" or very 
-           close variants like "software engineer". Having skills is NOT enough.
-        
-        2. Experience: Must have at least {min_experience_years if min_experience_years else "the required"} 
-           years of experience specifically in developer roles.
-        
-        3. Skills: Must have ALL the specific skills mentioned in the query.
-        
-        4. Location: Must be in {country if country else "the specified location"}.
-        
-        Return ONLY resumeIds of candidates who meet ALL criteria. It's better to 
-        return fewer excellent matches than many poor matches.
-        
-        Format your response as JSON:
-        {{
-          "top_resume_ids": [...], 
-          "reasoning": "brief explanation of why these candidates match"
-        }}
-        """
-        
-        # Use LLM to evaluate candidates against strict criteria
-        chat = _openai_client.chat.completions.create(
-            model=EVAL_MODEL_NAME,
-            response_format={"type": "json_object"},
-            messages=[
-                {"role": "system", "content": system_prompt},
-                {"role": "user", "content": f"Candidates: {json.dumps(candidates)}"},
-            ],
-        )
-        
-        # Parse LLM response
-        try:
-            content = json.loads(chat.choices[0].message.content)
-            best_ids = content.get("top_resume_ids", [])
-            reasoning = content.get("reasoning", "")
-        except Exception as e:
-            return {"error": f"Error parsing LLM response: {str(e)}"}
-        
-        # Get the best candidates using the IDs from the LLM
-        best_resumes = [r for r in candidates if r["resumeId"] in best_ids]
-        
-        return {
-            "message": f"Found {len(best_resumes)} resumes that meet ALL criteria out of {len(candidates)} initial matches.",
-            "results_count": len(best_resumes),
-            "results": best_resumes,
-            "reasoning": reasoning,
-            "completed_at": datetime.utcnow().isoformat(),
-        }
     except PyMongoError as err:
-        return {"error": f"DB error: {str(err)}"}
+        return {"error": f"Database error: {str(err)}"}
     except Exception as exc:
-        return {"error": str(exc)}
+        return {"error": f"Unexpected error: {str(exc)}"}
+
 
 
 @tool
