@@ -1,146 +1,13 @@
-"""
-ZappBot design module
-Contains UI functions, CSS styles, and display components
-"""
-
 import streamlit as st
-from typing import List, Dict, Any, Optional
+from typing import List, Dict, Any
 
-# CSS styles for UI components
-RESUME_GRID_CSS = """
-<style>
-.resume-card {
-    border: 1px solid #e1e4e8;
-    border-radius: 10px;
-    padding: 16px;
-    margin-bottom: 15px;
-    background-color: white;
-    box-shadow: 0 3px 8px rgba(0,0,0,0.05);
-    height: 100%;
-    transition: transform 0.2s, box-shadow 0.2s;
-}
-.resume-card:hover {
-    transform: translateY(-3px);
-    box-shadow: 0 5px 15px rgba(0,0,0,0.1);
-}
-.resume-name {
-    font-weight: bold;
-    font-size: 18px;
-    margin-bottom: 8px;
-    color: #24292e;
-}
-.resume-location {
-    color: #586069;
-    font-size: 14px;
-    margin-bottom: 10px;
-}
-.resume-contact {
-    margin-bottom: 8px;
-    font-size: 14px;
-    color: #444d56;
-}
-.resume-section-title {
-    font-weight: 600;
-    margin-top: 12px;
-    margin-bottom: 6px;
-    font-size: 15px;
-    color: #24292e;
-}
-.resume-experience {
-    font-size: 14px;
-    color: #444d56;
-    margin-bottom: 4px;
-}
-.skill-tag {
-    display: inline-block;
-    background-color: #f1f8ff;
-    color: #0366d6;
-    border-radius: 12px;
-    padding: 3px 10px;
-    margin: 3px;
-    font-size: 12px;
-    font-weight: 500;
-}
-.keyword-tag {
-    display: inline-block;
-    background-color: #FFF8E1;
-    color: #FF8F00;
-    border-radius: 12px;
-    padding: 3px 10px;
-    margin: 3px;
-    font-size: 12px;
-    font-weight: 500;
-}
-.job-matches {
-    margin-top: 8px;
-    padding: 4px 10px;
-    background-color: #E3F2FD;
-    border-radius: 4px;
-    display: inline-block;
-    font-size: 14px;
-    color: #0D47A1;
-}
-.resume-id {
-    font-size: 10px;
-    color: #6a737d;
-    margin-top: 8px;
-    word-break: break-all;
-}
-</style>
-"""
-
-APP_STYLE_CSS = """
-<style>
-    .stApp {
-        max-width: 1200px;
-        margin: 0 auto;
-    }
-    .header-container {
-        display: flex;
-        align-items: center;
-        margin-bottom: 20px;
-    }
-    .header-emoji {
-        font-size: 36px;
-        margin-right: 10px;
-    }
-    .header-text {
-        font-size: 24px;
-        font-weight: 600;
-    }
-    .resume-section {
-        margin-top: 20px;
-        padding: 15px;
-        border-radius: 8px;
-        background-color: #f8f9fa;
-        border-left: 4px solid #0366d6;
-    }
-    .resume-query {
-        font-weight: 600;
-        margin-bottom: 10px;
-        color: #0366d6;
-    }
-    .st-expander {
-        border: none !important;
-        box-shadow: none !important;
-    }
-    .tool-section {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
-    }
-</style>
-"""
-
-def display_resume_grid(resumes: List[Dict[str, Any]], container=None, debug_mode=False) -> None:
+def display_resume_grid(resumes, container=None):
     """
     Display resumes in a 3x3 grid layout with styled cards.
     
     Args:
-        resumes: List of resume dictionaries
-        container: Optional Streamlit container to render in
-        debug_mode: Whether to show debug info like resumeId
+        resumes: List of resume dictionaries to display
+        container: Optional Streamlit container to render into (defaults to st)
     """
     target = container if container else st
     
@@ -149,7 +16,87 @@ def display_resume_grid(resumes: List[Dict[str, Any]], container=None, debug_mod
         return
     
     # Custom CSS for the resume cards
-    target.markdown(RESUME_GRID_CSS, unsafe_allow_html=True)
+    target.markdown("""
+    <style>
+    .resume-card {
+        border: 1px solid #e1e4e8;
+        border-radius: 10px;
+        padding: 16px;
+        margin-bottom: 15px;
+        background-color: white;
+        box-shadow: 0 3px 8px rgba(0,0,0,0.05);
+        height: 100%;
+        transition: transform 0.2s, box-shadow 0.2s;
+    }
+    .resume-card:hover {
+        transform: translateY(-3px);
+        box-shadow: 0 5px 15px rgba(0,0,0,0.1);
+    }
+    .resume-name {
+        font-weight: bold;
+        font-size: 18px;
+        margin-bottom: 8px;
+        color: #24292e;
+    }
+    .resume-location {
+        color: #586069;
+        font-size: 14px;
+        margin-bottom: 10px;
+    }
+    .resume-contact {
+        margin-bottom: 8px;
+        font-size: 14px;
+        color: #444d56;
+    }
+    .resume-section-title {
+        font-weight: 600;
+        margin-top: 12px;
+        margin-bottom: 6px;
+        font-size: 15px;
+        color: #24292e;
+    }
+    .resume-experience {
+        font-size: 14px;
+        color: #444d56;
+        margin-bottom: 4px;
+    }
+    .skill-tag {
+        display: inline-block;
+        background-color: #f1f8ff;
+        color: #0366d6;
+        border-radius: 12px;
+        padding: 3px 10px;
+        margin: 3px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .keyword-tag {
+        display: inline-block;
+        background-color: #FFF8E1;
+        color: #FF8F00;
+        border-radius: 12px;
+        padding: 3px 10px;
+        margin: 3px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+    .job-matches {
+        margin-top: 8px;
+        padding: 4px 10px;
+        background-color: #E3F2FD;
+        border-radius: 4px;
+        display: inline-block;
+        font-size: 14px;
+        color: #0D47A1;
+    }
+    .resume-id {
+        font-size: 10px;
+        color: #6a737d;
+        margin-top: 8px;
+        word-break: break-all;
+    }
+    </style>
+    """, unsafe_allow_html=True)
     
     # Create a 3-column grid
     num_resumes = len(resumes)
@@ -215,9 +162,9 @@ def display_resume_grid(resumes: List[Dict[str, Any]], container=None, debug_mod
                         html += '</div>'
                     
                     # Show resume ID in debug mode
+                    debug_mode = getattr(st.session_state, 'debug_mode', False)
                     if debug_mode and resume_id:
                         html += f'<div class="resume-id">ID: {resume_id}</div>'
                     
                     html += '</div>'
                     st.markdown(html, unsafe_allow_html=True)
-
