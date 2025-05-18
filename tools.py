@@ -16,7 +16,7 @@ from variants import expand, COUNTRY_EQUIV, SKILL_VARIANTS, TITLE_VARIANTS
 # Constants
 SMTP_HOST, SMTP_PORT = "smtp.gmail.com", 465
 SMTP_USER, SMTP_PASS = st.secrets["SMTP_USER"], st.secrets["SMTP_PASS"]
-TOP_K_DEFAULT = 100
+TOP_K_DEFAULT = 20
 DB_NAME = "resumes_database"
 COLL_NAME = "resumes"
 
