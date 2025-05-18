@@ -64,7 +64,27 @@ def query_db(
         
         # Country filter (if provided)
         if country:
-            mongo_q["country"] = {"$in": COUNTRY_EQUIV.get(country.strip().lower(), [country])}
+            # Case-insensitive country search
+            country_name = country.strip()
+            country_variants = COUNTRY_EQUIV.get(country_name.lower(), [country_name])
+            
+            # Add both original case and lowercase versions of country names
+            country_matches = []
+            for variant in country_variants:
+                # Add original variant
+                country_matches.append(variant)
+                # Add capitalized variant
+                country_matches.append(variant.capitalize())
+                # Add uppercase variant
+                country_matches.append(variant.upper())
+                # Add title case variant
+                country_matches.append(variant.title())
+            
+            # Remove duplicates
+            country_matches = list(set(country_matches))
+            
+            # Use $regex with 'i' option for case-insensitive matching
+            mongo_q["country"] = {"$regex": f"^({'|'.join(country_matches)})$", "$options": "i"}
         
         # Skills filter - using AND logic between different skills, but OR between variants
         if skills and len(skills) > 0:
