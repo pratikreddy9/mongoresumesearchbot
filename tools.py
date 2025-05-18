@@ -1,5 +1,7 @@
 import os
 from typing import List, Optional, Dict, Any
+import logging
+import sys
 
 import streamlit as st
 import smtplib, ssl
@@ -13,10 +15,20 @@ import json
 from utils import get_mongo_client, reformat_email_body
 from variants import expand, COUNTRY_EQUIV, SKILL_VARIANTS, TITLE_VARIANTS
 
+# Configure logging to output to both console and Streamlit
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s [%(levelname)s] %(message)s',
+    handlers=[
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
+
 # Constants
 SMTP_HOST, SMTP_PORT = "smtp.gmail.com", 465
 SMTP_USER, SMTP_PASS = st.secrets["SMTP_USER"], st.secrets["SMTP_PASS"]
-TOP_K_DEFAULT = 20
+TOP_K_DEFAULT = 100
 DB_NAME = "resumes_database"
 COLL_NAME = "resumes"
 
@@ -154,13 +166,15 @@ def query_db(
         with get_mongo_client() as client:
             coll = client[DB_NAME][COLL_NAME]
             
-            # Always print the MongoDB query for debugging
-            print(f"\n--- MongoDB Query ---\n{json.dumps(mongo_q, indent=2)}\n-------------------\n")
+            # Use logging instead of print for more reliable output
+            query_str = json.dumps(mongo_q, indent=2)
+            logger.info(f"MongoDB Query: {query_str}")
             
-            # Additional debug output if in debug mode
-            debug_mode = getattr(st.session_state, 'debug_mode', False)
-            if debug_mode:
-                st.write(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
+            # Force flush stdout to ensure immediate output
+            sys.stdout.flush()
+            
+            # Also write to streamlit directly for visibility
+            st.write(f"```json\n{query_str}\n```")
             
             # Get the candidate pool from MongoDB using top_k to limit results
             candidates = list(coll.find(mongo_q, {"_id": 0, "embedding": 0}).limit(top_k))
