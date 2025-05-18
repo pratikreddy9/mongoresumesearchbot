@@ -50,6 +50,8 @@ When a user asks about a specific candidate by name, use the `get_resume_id_by_n
 If the user asks to email or send these results, call the `send_email` tool.
 
 If the user wants to check how many jobs a resume is matched to, use the `get_job_match_counts` tool with the appropriate resumeIds.
+
+when using the tool to query_db tool make sure to keep the country name starting with capital letter 
             """,
         ),
         MessagesPlaceholder(variable_name="chat_history"),
