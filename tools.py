@@ -166,15 +166,34 @@ def query_db(
         with get_mongo_client() as client:
             coll = client[DB_NAME][COLL_NAME]
             
-            # Use logging instead of print for more reliable output
+            # Use logging for console output
             query_str = json.dumps(mongo_q, indent=2)
             logger.info(f"MongoDB Query: {query_str}")
             
-            # Force flush stdout to ensure immediate output
-            sys.stdout.flush()
+            # Store query in session state for persistent display
+            if "mongo_queries" not in st.session_state:
+                st.session_state.mongo_queries = []
             
-            # Also write to streamlit directly for visibility
-            st.write(f"```json\n{query_str}\n```")
+            # Add timestamp to the query for reference
+            timestamped_query = {
+                "timestamp": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+                "query": query_str,
+                "parameters": {
+                    "country": country,
+                    "min_experience_years": min_experience_years,
+                    "max_experience_years": max_experience_years,
+                    "job_titles": job_titles,
+                    "skills": skills,
+                    "top_k": top_k
+                }
+            }
+            
+            # Add to the beginning of the list (most recent first)
+            st.session_state.mongo_queries.insert(0, timestamped_query)
+            
+            # Keep only the last 10 queries to avoid clutter
+            if len(st.session_state.mongo_queries) > 10:
+                st.session_state.mongo_queries = st.session_state.mongo_queries[:10]
             
             # Get the candidate pool from MongoDB using top_k to limit results
             candidates = list(coll.find(mongo_q, {"_id": 0, "embedding": 0}).limit(top_k))
