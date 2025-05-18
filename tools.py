@@ -8,23 +8,17 @@ from email.mime.multipart import MIMEMultipart
 from datetime import datetime
 from langchain_core.tools import tool
 from pymongo.errors import PyMongoError
-import openai
 import json
 
-from utils import get_mongo_client, score_resumes
+from utils import get_mongo_client, reformat_email_body
 from variants import expand, COUNTRY_EQUIV, SKILL_VARIANTS, TITLE_VARIANTS
 
 # Constants
-OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 SMTP_HOST, SMTP_PORT = "smtp.gmail.com", 465
 SMTP_USER, SMTP_PASS = st.secrets["SMTP_USER"], st.secrets["SMTP_PASS"]
-EVAL_MODEL_NAME = "gpt-4o" 
-TOP_K_DEFAULT = 20
+TOP_K_DEFAULT = 100
 DB_NAME = "resumes_database"
 COLL_NAME = "resumes"
-
-# Initialize OpenAI client
-_openai_client = openai.OpenAI(api_key=OPENAI_API_KEY)
 
 @tool
 def query_db(
@@ -159,9 +153,14 @@ def query_db(
         # Execute the MongoDB query
         with get_mongo_client() as client:
             coll = client[DB_NAME][COLL_NAME]
+            
+            # Always print the MongoDB query for debugging
+            print(f"\n--- MongoDB Query ---\n{json.dumps(mongo_q, indent=2)}\n-------------------\n")
+            
+            # Additional debug output if in debug mode
             debug_mode = getattr(st.session_state, 'debug_mode', False)
             if debug_mode:
-                print(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
+                st.write(f"MongoDB Query: {json.dumps(mongo_q, indent=2)}")
             
             # Get the candidate pool from MongoDB using top_k to limit results
             candidates = list(coll.find(mongo_q, {"_id": 0, "embedding": 0}).limit(top_k))
@@ -179,10 +178,19 @@ def query_db(
         return {"error": f"Unexpected error: {str(exc)}"}
 
 
-
 @tool
 def send_email(to: str, subject: str, body: str) -> str:
-    """Send a plain text email using SMTP_USER / SMTP_PASS from secrets.toml."""
+    """
+    Send a plain text email using SMTP credentials from secrets.
+    
+    Args:
+        to: Recipient email address
+        subject: Email subject line
+        body: Plain text email body
+        
+    Returns:
+        Success message or error description
+    """
     try:
         msg = MIMEMultipart("alternative")
         msg["Subject"], msg["From"], msg["To"] = subject, SMTP_USER, to
@@ -192,9 +200,9 @@ def send_email(to: str, subject: str, body: str) -> str:
         with smtplib.SMTP_SSL(SMTP_HOST, SMTP_PORT, context=ctx) as srv:
             srv.login(SMTP_USER, SMTP_PASS)
             srv.send_message(msg)
-        return "Email sent!"
+        return "Email sent successfully!"
     except Exception as e:
-        return f"Email failed: {e}"
+        return f"Email sending failed: {e}"
 
 
 @tool
@@ -202,6 +210,12 @@ def get_job_match_counts(resume_ids: List[str]) -> Dict[str, Any]:
     """
     Given a list of resumeIds, return how many unique jobIds each resume is
     matched to in the resume_matches collection.
+    
+    Args:
+        resume_ids: List of resume IDs to check
+        
+    Returns:
+        Dictionary with job match counts for each resume
     """
     try:
         if not isinstance(resume_ids, list):
@@ -214,21 +228,27 @@ def get_job_match_counts(resume_ids: List[str]) -> Dict[str, Any]:
                 jobs = doc.get("matches", []) if doc else []
                 results.append({"resumeId": rid, "jobsMatched": len(jobs)})
         return {
-            "message": f"Counts fetched for {len(results)} resumeIds.",
+            "message": f"Job match counts fetched for {len(results)} resumeIds.",
             "results_count": len(results),
             "results": results,
             "completed_at": datetime.utcnow().isoformat(),
         }
     except PyMongoError as err:
-        return {"error": f"DB error: {str(err)}"}
+        return {"error": f"Database error: {str(err)}"}
     except Exception as exc:
-        return {"error": str(exc)}
+        return {"error": f"Unexpected error: {str(exc)}"}
 
 
 @tool
 def get_resume_id_by_name(name: str) -> Dict[str, Any]:
     """
     Given a candidate name, return their resumeId if it exists in our records.
+    
+    Args:
+        name: The candidate's name (full or partial)
+        
+    Returns:
+        Dictionary with resumeId if found
     """
     try:
         if "resume_ids" not in st.session_state:
@@ -275,4 +295,4 @@ def get_resume_id_by_name(name: str) -> Dict[str, Any]:
         
         return {"found": False, "message": f"No resumeId found for '{name}'"}
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"Error looking up resume ID: {str(e)}"}
