@@ -376,12 +376,14 @@ with chat_container:
             
             st.subheader("Job Match Data")
             st.json(st.session_state.job_match_data)
-            
-            # Display MongoDB Queries
-            if "mongo_queries" in st.session_state and st.session_state.mongo_queries:
-                st.subheader("Recent MongoDB Queries")
-                for i, q in enumerate(st.session_state.mongo_queries):
-                    with st.expander(f"Query {i+1} - {q['timestamp']}"):
-                        st.code(q["query"], language="json")
-                        st.write("Parameters:")
-                        st.json(q["parameters"])
+    
+    # Display MongoDB Queries in a separate expander
+    if debug_mode and "mongo_queries" in st.session_state and st.session_state.mongo_queries:
+        with st.expander("Recent MongoDB Queries"):
+            for i, q in enumerate(st.session_state.mongo_queries):
+                st.markdown(f"**Query {i+1} - {q['timestamp']}**")
+                st.code(q["query"], language="json")
+                st.write("Parameters:")
+                st.json(q["parameters"])
+                if i < len(st.session_state.mongo_queries) - 1:
+                    st.markdown("---")  # Add separator between queries
