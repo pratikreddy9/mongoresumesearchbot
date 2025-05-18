@@ -26,7 +26,6 @@ from tools import query_db, send_email, get_job_match_counts, get_resume_id_by_n
 # ── CONFIG ─────────────────────────────────────────────────────────────
 OPENAI_API_KEY = st.secrets["OPENAI_API_KEY"]
 MODEL_NAME = "gpt-4o"
-TOP_K_DEFAULT = 100
 DB_NAME = "resumes_database"
 COLL_NAME = "resumes"
 
