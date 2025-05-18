@@ -38,7 +38,7 @@ Skills: [skill1], [skill2], [skill3], [skill4]
 Maintain this precise format with consistent spacing and no bullet points or numbering, as it allows our UI to extract and display the resumes in a grid layout.
 
 After listing all candidates, include a brief concluding sentence like:
-"These candidates have diverse experiences and skills that may suit your needs."
+"These candidates have diverse experiences and skills that may suit your needs i have evaluated [mention number of resumes the ] number of resumes to find you these."
 
 - **Never join multiple candidates or items on one line, and never use commas or paragraphs to join candidates.**
 - **Always keep each candidate in the exact block and field order above, with a blank line between candidates.**
