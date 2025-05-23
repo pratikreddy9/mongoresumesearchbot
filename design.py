@@ -150,14 +150,14 @@ def display_resume_grid(resumes, container=None):
                     # Add skills section
                     if skills:
                         html += f'<div class="resume-section-title">Skills</div><div>'
-                        for skill in skills[:7]:  # Limit to 7 skills
+                        for skill in skills:  # Limit to 7 skills
                             html += f'<span class="skill-tag">{skill}</span>'
                         html += '</div>'
                     
                     # Add keywords section (with different styling)
                     if keywords:
                         html += f'<div class="resume-section-title">Keywords</div><div>'
-                        for keyword in keywords[:5]:  # Limit to 5 keywords
+                        for keyword in keywords:  # Limit to 5 keywords
                             html += f'<span class="keyword-tag">{keyword}</span>'
                         html += '</div>'
                     
