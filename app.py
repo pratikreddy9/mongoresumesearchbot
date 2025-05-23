@@ -69,91 +69,324 @@ elif not st.session_state.get("agent_upgraded", False):
     st.session_state.agent_upgraded = True
 
 # ── STREAMLIT UI ───────────────────────────────────────────────────────
-st.set_page_config(page_title="ZappBot", layout="wide")
+st.set_page_config(page_title="⚡ ZappBot", layout="wide", initial_sidebar_state="expanded")
 
-# Apply custom CSS
+# 🔥 ULTIMATE WOW FACTOR CSS
 st.markdown("""
 <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    
+    /* Dark theme with glassmorphism */
     .stApp {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+        font-family: 'Inter', sans-serif;
         max-width: none !important;
-        margin: 0 auto;
     }
+    
+    /* Glassmorphism container */
+    .main-container {
+        backdrop-filter: blur(20px);
+        background: rgba(255, 255, 255, 0.1);
+        border-radius: 20px;
+        border: 1px solid rgba(255, 255, 255, 0.2);
+        margin: 20px;
+        padding: 30px;
+        box-shadow: 0 25px 50px rgba(0, 0, 0, 0.15);
+    }
+    
+    /* Animated header with gradient text */
     .header-container {
         display: flex;
         align-items: center;
-        margin-bottom: 20px;
+        justify-content: center;
+        margin-bottom: 40px;
+        padding: 20px;
+        background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%);
+        border-radius: 20px;
+        backdrop-filter: blur(10px);
+        border: 1px solid rgba(255,255,255,0.1);
     }
+    
     .header-emoji {
-        font-size: 36px;
-        margin-right: 10px;
+        font-size: 48px;
+        margin-right: 20px;
+        animation: pulse 2s infinite;
+        filter: drop-shadow(0 0 20px rgba(255,215,0,0.5));
     }
+    
+    @keyframes pulse {
+        0% { transform: scale(1); }
+        50% { transform: scale(1.1); }
+        100% { transform: scale(1); }
+    }
+    
     .header-text {
-        font-size: 24px;
-        font-weight: 600;
+        font-size: 42px;
+        font-weight: 800;
+        background: linear-gradient(135deg, #FFD700, #FF6B6B, #4ECDC4, #45B7D1);
+        -webkit-background-clip: text;
+        background-clip: text;
+        -webkit-text-fill-color: transparent;
+        animation: gradient-shift 3s ease-in-out infinite;
+        text-shadow: 0 0 30px rgba(255,255,255,0.3);
     }
-    .resume-section {
-        margin-top: 20px;
-        padding: 15px;
-        border-radius: 8px;
-        background-color: #f8f9fa;
-        border-left: 4px solid #0366d6;
+    
+    @keyframes gradient-shift {
+        0%, 100% { filter: hue-rotate(0deg); }
+        50% { filter: hue-rotate(90deg); }
     }
-    .resume-query {
-        font-weight: 600;
-        margin-bottom: 10px;
-        color: #0366d6;
+    
+    /* Sidebar styling */
+    .css-1d391kg {
+        background: linear-gradient(135deg, rgba(0,0,0,0.7) 0%, rgba(0,0,0,0.5) 100%);
+        backdrop-filter: blur(20px);
+        border-right: 1px solid rgba(255,255,255,0.1);
     }
-    .st-expander {
+    
+    /* Chat messages with modern styling */
+    .stChatMessage {
+        background: rgba(255,255,255,0.05) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 15px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        margin: 10px 0 !important;
+        animation: slideIn 0.3s ease-out;
+    }
+    
+    @keyframes slideIn {
+        from { opacity: 0; transform: translateY(20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Enhanced buttons with hover effects */
+    .stButton > button {
+        background: linear-gradient(135deg, #667eea 0%, #764ba2 100%) !important;
+        color: white !important;
         border: none !important;
-        box-shadow: none !important;
+        border-radius: 25px !important;
+        padding: 12px 24px !important;
+        font-weight: 600 !important;
+        font-size: 14px !important;
+        transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1) !important;
+        box-shadow: 0 8px 32px rgba(102, 126, 234, 0.3) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
     }
-    .tool-section {
-        background-color: #f8f9fa;
-        padding: 15px;
-        border-radius: 8px;
-        margin-bottom: 20px;
+    
+    .stButton > button:hover {
+        transform: translateY(-3px) scale(1.05) !important;
+        box-shadow: 0 15px 40px rgba(102, 126, 234, 0.4) !important;
+        background: linear-gradient(135deg, #764ba2 0%, #667eea 100%) !important;
+    }
+    
+    .stButton > button:active {
+        transform: translateY(-1px) scale(1.02) !important;
+    }
+    
+    /* Expander styling */
+    .streamlit-expanderHeader {
+        background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 15px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        color: white !important;
+        font-weight: 600 !important;
+        transition: all 0.3s ease !important;
+    }
+    
+    .streamlit-expanderHeader:hover {
+        background: linear-gradient(135deg, rgba(255,255,255,0.15) 0%, rgba(255,255,255,0.1) 100%) !important;
+        transform: translateY(-2px) !important;
+        box-shadow: 0 10px 30px rgba(0,0,0,0.2) !important;
+    }
+    
+    /* Input field styling */
+    .stTextInput > div > div > input {
+        background: rgba(255,255,255,0.1) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 15px !important;
+        color: white !important;
+        padding: 15px 20px !important;
+        font-size: 16px !important;
+    }
+    
+    .stTextInput > div > div > input::placeholder {
+        color: rgba(255,255,255,0.6) !important;
+    }
+    
+    /* Chat input styling */
+    .stChatInputContainer {
+        background: rgba(0,0,0,0.3) !important;
+        backdrop-filter: blur(20px) !important;
+        border-radius: 25px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        margin: 20px 0 !important;
+    }
+    
+    /* Resume results section */
+    .resume-results-header {
+        text-align: center;
+        color: white;
+        font-size: 28px;
+        font-weight: 700;
+        margin: 40px 0 30px 0;
+        text-shadow: 0 0 20px rgba(255,255,255,0.3);
+    }
+    
+    /* Floating action buttons */
+    .floating-stats {
+        position: fixed;
+        top: 20px;
+        right: 20px;
+        background: rgba(0,0,0,0.7);
+        backdrop-filter: blur(20px);
+        border-radius: 15px;
+        padding: 15px 20px;
+        color: white;
+        font-weight: 600;
+        border: 1px solid rgba(255,255,255,0.1);
+        z-index: 1000;
+        animation: fadeIn 1s ease-out;
+    }
+    
+    @keyframes fadeIn {
+        from { opacity: 0; transform: translateY(-20px); }
+        to { opacity: 1; transform: translateY(0); }
+    }
+    
+    /* Success/Error messages with better styling */
+    .stSuccess {
+        background: linear-gradient(135deg, rgba(76, 175, 80, 0.15) 0%, rgba(76, 175, 80, 0.05) 100%) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(76, 175, 80, 0.3) !important;
+        border-radius: 15px !important;
+        color: #81C784 !important;
+    }
+    
+    .stError {
+        background: linear-gradient(135deg, rgba(244, 67, 54, 0.15) 0%, rgba(244, 67, 54, 0.05) 100%) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(244, 67, 54, 0.3) !important;
+        border-radius: 15px !important;
+        color: #EF5350 !important;
+    }
+    
+    /* Checkbox styling */
+    .stCheckbox {
+        color: white !important;
+    }
+    
+    /* Selectbox styling */
+    .stSelectbox > div > div {
+        background: rgba(255,255,255,0.1) !important;
+        backdrop-filter: blur(10px) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
+        border-radius: 15px !important;
+        color: white !important;
+    }
+    
+    /* Divider styling */
+    hr {
+        border: none !important;
+        height: 2px !important;
+        background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.05) 100%) !important;
+        margin: 30px 0 !important;
+    }
+    
+    /* Loading spinner enhancement */
+    .stSpinner {
+        background: rgba(255,255,255,0.1) !important;
+        backdrop-filter: blur(20px) !important;
+        border-radius: 20px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+    }
+    
+    /* Sidebar text color */
+    .css-1d391kg .stMarkdown {
+        color: white !important;
+    }
+    
+    /* Main content text color */
+    .main .stMarkdown {
+        color: white !important;
+    }
+    
+    /* JSON display styling */
+    .stJson {
+        background: rgba(0,0,0,0.3) !important;
+        backdrop-filter: blur(10px) !important;
+        border-radius: 15px !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+    }
+    
+    .element-container:has(.floating-stats) {
+        position: fixed !important;
+        top: 20px !important;
+        right: 20px !important;
+        z-index: 1000 !important;
     }
 </style>
 """, unsafe_allow_html=True)
 
-# Header
-st.markdown('<div class="header-container"><div class="header-emoji">⚡</div><div class="header-text">ZappBot</div></div>', unsafe_allow_html=True)
+# 🎯 Floating Stats Counter
+total_resumes = len(st.session_state.resume_ids)
+st.markdown(f"""
+<div class="floating-stats">
+    📊 {total_resumes} Resumes Loaded
+</div>
+""", unsafe_allow_html=True)
 
-# Sidebar with settings
+# 🚀 Enhanced Header
+st.markdown('''
+<div class="header-container">
+    <div class="header-emoji">⚡</div>
+    <div class="header-text">ZappBot</div>
+</div>
+''', unsafe_allow_html=True)
+
+# 🎨 Enhanced Sidebar
 with st.sidebar:
-    st.header("Settings")
-    debug_mode = st.checkbox("Debug Mode", value=False)
+    st.markdown("## ⚙️ Settings")
+    debug_mode = st.checkbox("🐛 Debug Mode", value=False)
     
     # Email settings section
-    st.subheader("Email Settings")
+    st.markdown("### 📧 Email Settings")
     default_recipient = st.text_input("Default Email Recipient", 
                                      placeholder="recipient@example.com",
                                      help="Default email to use when sending resume results")
     
     # Job matching tool section
-    st.subheader("Job Matching")
+    st.markdown("### 🎯 Job Matching")
     st.markdown("""
-    To check job matches, ask about a specific candidate:
+    💡 **Quick Tip**: Ask about specific candidates:
     ```
     How many jobs is [Candidate Name] matched to?
     ```
     """)
     
-    if st.button("Clear Chat History"):
+    if st.button("🗑️ Clear Chat History"):
         st.session_state.memory.clear()
         st.session_state.processed_responses = {}
         st.session_state.job_match_data = {}
         st.session_state.resume_ids = {}
         st.rerun()
+    
+    # Add some stats
+    st.markdown("---")
+    st.markdown("### 📈 Session Stats")
+    st.metric("💼 Resumes Found", len(st.session_state.resume_ids))
+    st.metric("🎯 Job Matches", len(st.session_state.job_match_data))
+    st.metric("💬 Conversations", len(st.session_state.memory.chat_memory.messages) // 2)
 
 # Main chat container
 chat_container = st.container()
 
 # Handle user input
-user_input = st.chat_input("Ask me to find resumes...")
+user_input = st.chat_input("🔍 Ask me to find the perfect resumes...")
 if user_input:
     # Process with agent
-    with st.spinner("Thinking..."):
+    with st.spinner("🧠 AI is thinking..."):
         try:
             # Invoke the agent
             response = st.session_state.agent_executor.invoke({"input": user_input})
@@ -192,10 +425,9 @@ if user_input:
             st.rerun()
             
         except Exception as e:
-            st.error(f"Error: {str(e)}")
+            st.error(f"❌ Error: {str(e)}")
             if debug_mode:
                 st.exception(e)
-
 
 # Display the complete chat history
 with chat_container:
@@ -205,7 +437,7 @@ with chat_container:
     # Display all messages
     for i, msg in enumerate(st.session_state.memory.chat_memory.messages):
         if msg.type == "human":
-            st.chat_message("user").write(msg.content)
+            st.chat_message("user", avatar="👤").write(msg.content)
             
             # Store the user query for context if the next message is a resume response
             if i+1 < len(st.session_state.memory.chat_memory.messages):
@@ -238,7 +470,7 @@ with chat_container:
             processed = st.session_state.processed_responses[msg_key]
             
             # Display the message
-            ai_message = st.chat_message("assistant")
+            ai_message = st.chat_message("assistant", avatar="⚡")
             if processed["is_resume_response"]:
                 # Extract and store resumeIds if they are in the message
                 resume_ids = extract_resume_ids_from_response(processed["full_text"])
@@ -262,13 +494,12 @@ with chat_container:
     
     # Display all resume grids after the chat
     if resume_responses:
-        st.markdown("---")
-        st.subheader("Resume Search Results")
+        st.markdown('<div class="resume-results-header">🎯 Resume Search Results</div>', unsafe_allow_html=True)
         
         # Create an expander for each resume search
         for i, resp in enumerate(resume_responses):
-            with st.expander(f"Search {i+1}: {resp['query']}", expanded=(i == len(resume_responses)-1)):
-                st.markdown(f"<div class='resume-query'>{resp['processed']['intro_text']}</div>", unsafe_allow_html=True)
+            with st.expander(f"🔍 Search {i+1}: {resp['query']}", expanded=(i == len(resume_responses)-1)):
+                st.markdown(f"**{resp['processed']['intro_text']}**")
                 
                 # Make sure resumes have resumeIds
                 attach_hidden_resume_ids(resp['processed']['resumes'])
@@ -288,7 +519,7 @@ with chat_container:
                 # Display the resume grid
                 display_resume_grid(resp['processed']['resumes'])
                 
-                # Add a row with email button and job match button
+                # Add a row with enhanced buttons
                 cols = st.columns([2, 1, 1])
                 
                 # Email button
@@ -308,7 +539,7 @@ with chat_container:
                                 # Get recipient email
                                 recipient = default_recipient
                                 if not recipient:
-                                    st.error("Please set a default email recipient in the sidebar.")
+                                    st.error("❌ Please set a default email recipient in the sidebar.")
                                 else:
                                     # Send the email
                                     result = send_email(
@@ -316,14 +547,14 @@ with chat_container:
                                         subject=f"ZappBot Results: {resp['query']}",
                                         body=plain_text_body
                                     )
-                                    st.success(f"Email sent to {recipient}")
+                                    st.success(f"✅ Email sent to {recipient}")
                             except Exception as e:
-                                st.error(f"Failed to send email: {str(e)}")
+                                st.error(f"❌ Failed to send email: {str(e)}")
                 
-                # Job Match button - FIXED VERSION
+                # Job Match button
                 with cols[2]:
                     if resp['processed']['resumes']:
-                        if st.button("🔍 Match Jobs", key=f"job_btn_{i}"):
+                        if st.button("🎯 Match Jobs", key=f"job_btn_{i}"):
                             try:
                                 # Extract resume IDs
                                 resume_ids = []
@@ -358,18 +589,18 @@ with chat_container:
                                                     if resume_id:
                                                         st.session_state.job_match_data[resume_id] = item.get("jobsMatched", 0)
                                                 
-                                                st.success(f"Job match data updated for {len(match_data)} resumes")
+                                                st.success(f"🎯 Job match data updated for {len(match_data)} resumes")
                                                 st.rerun()
                                             else:
-                                                st.error("Could not parse job match data from response")
+                                                st.error("❌ Could not parse job match data from response")
                                         except Exception as parse_error:
-                                            st.error(f"Failed to parse job match data: {str(parse_error)}")
+                                            st.error(f"❌ Failed to parse job match data: {str(parse_error)}")
                                     else:
-                                        st.error("No job match data found in response")
+                                        st.error("❌ No job match data found in response")
                                 else:
-                                    st.warning("No resume IDs found")
+                                    st.warning("⚠️ No resume IDs found")
                             except Exception as e:
-                                st.error(f"Failed to get job matches: {str(e)}")
+                                st.error(f"❌ Failed to get job matches: {str(e)}")
                 
                 # Display conclusion if available
                 if resp['processed'].get('conclusion_text'):
@@ -377,14 +608,14 @@ with chat_container:
     
     # Show debug info if enabled
     if debug_mode:
-        with st.expander("Debug Information"):
-            st.subheader("Memory Contents")
+        with st.expander("🐛 Debug Information"):
+            st.subheader("💾 Memory Contents")
             st.json({i: msg.content for i, msg in enumerate(st.session_state.memory.chat_memory.messages)})
             
-            st.subheader("Stored Resume IDs")
+            st.subheader("🆔 Stored Resume IDs")
             st.json(st.session_state.resume_ids)
             
-            st.subheader("Processed Responses")
+            st.subheader("📝 Processed Responses")
             for key, value in st.session_state.processed_responses.items():
                 if "full_text" in value:
                     # Create a shorter version for display
@@ -394,12 +625,12 @@ with chat_container:
                 else:
                     st.json({key: value})
             
-            st.subheader("Job Match Data")
+            st.subheader("🎯 Job Match Data")
             st.json(st.session_state.job_match_data)
     
     # Display MongoDB Queries in a separate expander
     if debug_mode and "mongo_queries" in st.session_state and st.session_state.mongo_queries:
-        with st.expander("Recent MongoDB Queries"):
+        with st.expander("🗄️ Recent MongoDB Queries"):
             for i, q in enumerate(st.session_state.mongo_queries):
                 st.markdown(f"**Query {i+1} - {q['timestamp']}**")
                 st.code(q["query"], language="json")
