@@ -334,7 +334,7 @@ with chat_container:
                                 
                                 if resume_ids:
                                     # Call get_job_match_counts
-                                    result = get_job_match_counts(resume_ids)
+                                    result = st.session_state.agent_executor.invoke({"input": f"Get job match counts for these resume IDs: {resume_ids}"})
                                     if "results" in result:
                                         # Store job match data
                                         for item in result["results"]:
