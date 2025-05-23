@@ -100,12 +100,12 @@ def display_resume_grid(resumes, container=None):
     
     # Create a 3-column grid
     num_resumes = len(resumes)
-    rows = (num_resumes + 2) // 3  # Ceiling division for number of rows
+    rows = (num_resumes + 3) // 4  # Ceiling division for number of rows
     
     for row in range(rows):
         cols = target.columns(4)
-        for col in range(3):
-            idx = row * 3 + col
+        for col in range(4):
+            idx = row * 4 + col
             if idx < num_resumes:
                 resume = resumes[idx]
                 
