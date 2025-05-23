@@ -120,33 +120,17 @@ st.markdown("""
         border-right: 1px solid rgba(255,255,255,0.1);
     }
     
-    /* Chat messages */
+    /* Chat messages - Clean white background */
     .stChatMessage {
-        background: rgba(255,255,255,0.05) !important;
+        background: rgba(255,255,255,0.1) !important;
         backdrop-filter: blur(10px) !important;
         border-radius: 12px !important;
-        border: 1px solid rgba(255,255,255,0.1) !important;
+        border: 1px solid rgba(255,255,255,0.2) !important;
         margin: 8px 0 !important;
     }
     
-    /* User messages - Blue theme */
-    .stChatMessage[data-testid="chat-message-user"] {
-        background: rgba(33, 150, 243, 0.1) !important;
-        border: 1px solid rgba(33, 150, 243, 0.2) !important;
-    }
-    
-    .stChatMessage[data-testid="chat-message-user"] .stMarkdown {
-        color: #64B5F6 !important;
-    }
-    
-    /* AI messages - Green theme */
-    .stChatMessage[data-testid="chat-message-assistant"] {
-        background: rgba(76, 175, 80, 0.1) !important;
-        border: 1px solid rgba(76, 175, 80, 0.2) !important;
-    }
-    
-    .stChatMessage[data-testid="chat-message-assistant"] .stMarkdown {
-        color: #81C784 !important;
+    .stChatMessage .stMarkdown {
+        color: white !important;
     }
     
     /* Enhanced buttons */
