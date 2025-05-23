@@ -75,7 +75,7 @@ st.set_page_config(page_title="ZappBot", layout="wide")
 st.markdown("""
 <style>
     .stApp {
-        max-width: 1200px;
+        max-width: none !important;
         margin: 0 auto;
     }
     .header-container {
