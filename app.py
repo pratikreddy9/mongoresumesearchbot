@@ -129,6 +129,26 @@ st.markdown("""
         margin: 8px 0 !important;
     }
     
+    /* User messages - Blue theme */
+    .stChatMessage[data-testid="chat-message-user"] {
+        background: rgba(33, 150, 243, 0.1) !important;
+        border: 1px solid rgba(33, 150, 243, 0.2) !important;
+    }
+    
+    .stChatMessage[data-testid="chat-message-user"] .stMarkdown {
+        color: #64B5F6 !important;
+    }
+    
+    /* AI messages - Green theme */
+    .stChatMessage[data-testid="chat-message-assistant"] {
+        background: rgba(76, 175, 80, 0.1) !important;
+        border: 1px solid rgba(76, 175, 80, 0.2) !important;
+    }
+    
+    .stChatMessage[data-testid="chat-message-assistant"] .stMarkdown {
+        color: #81C784 !important;
+    }
+    
     /* Enhanced buttons */
     .stButton > button {
         background: linear-gradient(135deg, #4a90e2 0%, #357abd 100%) !important;
@@ -408,10 +428,10 @@ with chat_container:
                 
                 display_resume_grid(resp['processed']['resumes'])
                 
-                # Closer button layout
-                cols = st.columns([3, 1, 1])
+                # Closer button layout - side by side
+                cols = st.columns([2, 1, 1, 1])
                 
-                with cols[1]:
+                with cols[2]:
                     if resp['processed']['resumes']:
                         if st.button(f"📧 Email", key=f"email_btn_{i}"):
                             try:
@@ -436,7 +456,7 @@ with chat_container:
                             except Exception as e:
                                 st.error(f"❌ Failed to send email: {str(e)}")
                 
-                with cols[2]:
+                with cols[3]:
                     if resp['processed']['resumes']:
                         if st.button("🎯 Jobs", key=f"job_btn_{i}"):
                             try:
