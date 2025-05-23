@@ -320,7 +320,7 @@ with chat_container:
                             except Exception as e:
                                 st.error(f"Failed to send email: {str(e)}")
                 
-                # Job Match button
+                # Job Match button - FIXED VERSION
                 with cols[2]:
                     if resp['processed']['resumes']:
                         if st.button("🔍 Match Jobs", key=f"job_btn_{i}"):
@@ -333,18 +333,39 @@ with chat_container:
                                         resume_ids.append(resume_id)
                                 
                                 if resume_ids:
-                                    # Call get_job_match_counts
-                                    result = st.session_state.agent_executor.invoke({"input": f"Get job match counts for these resume IDs: {resume_ids}"})
-                                    if "results" in result:
-                                        # Store job match data
-                                        for item in result["results"]:
-                                            resume_id = item.get("resumeId")
-                                            if resume_id:
-                                                st.session_state.job_match_data[resume_id] = item.get("jobsMatched", 0)
-                                        st.success(f"Job match data updated for {len(resume_ids)} resumes")
-                                        st.rerun()
+                                    # Call agent to get job match counts
+                                    response = st.session_state.agent_executor.invoke({
+                                        "input": f"Get job match counts for these resume IDs: {resume_ids}"
+                                    })
+                                    
+                                    # Parse the job match data from the agent response
+                                    response_text = response["output"]
+                                    if "jobsMatched" in response_text:
+                                        try:
+                                            # Extract job match data from response text
+                                            matches_pattern = r"'results':\s*(\[.*?\])"
+                                            matches_match = re.search(matches_pattern, response_text, re.DOTALL)
+                                            if matches_match:
+                                                # Clean up the string and parse it
+                                                results_str = matches_match.group(1)
+                                                # Replace single quotes with double quotes for JSON parsing
+                                                results_str = results_str.replace("'", '"')
+                                                match_data = json.loads(results_str)
+                                                
+                                                # Store job match data
+                                                for item in match_data:
+                                                    resume_id = item.get("resumeId")
+                                                    if resume_id:
+                                                        st.session_state.job_match_data[resume_id] = item.get("jobsMatched", 0)
+                                                
+                                                st.success(f"Job match data updated for {len(match_data)} resumes")
+                                                st.rerun()
+                                            else:
+                                                st.error("Could not parse job match data from response")
+                                        except Exception as parse_error:
+                                            st.error(f"Failed to parse job match data: {str(parse_error)}")
                                     else:
-                                        st.error("Failed to get job match data")
+                                        st.error("No job match data found in response")
                                 else:
                                     st.warning("No resume IDs found")
                             except Exception as e:
