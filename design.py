@@ -99,7 +99,7 @@ def display_resume_grid(resumes, container=None):
         font-weight: bold;
     }
     
-    /* Skills - Blue theme */
+    /* Skills - ALL Blue theme */
     .skill-tag {
         display: inline-block;
         background: rgba(33, 150, 243, 0.2);
@@ -121,7 +121,7 @@ def display_resume_grid(resumes, container=None):
         border: 1px solid rgba(33, 150, 243, 0.5);
     }
     
-    /* Highlighted Skills - Orange theme */
+    /* ONLY Matched Skills - Orange theme */
     .skill-tag.highlight {
         background: rgba(255, 152, 0, 0.2);
         color: #FFB74D;
@@ -133,7 +133,7 @@ def display_resume_grid(resumes, container=None):
         border: 1px solid rgba(255, 152, 0, 0.6);
     }
     
-    /* Keywords - Green theme */
+    /* Keywords - ALL Green theme */
     .keyword-tag {
         display: inline-block;
         background: rgba(76, 175, 80, 0.2);
@@ -155,7 +155,7 @@ def display_resume_grid(resumes, container=None):
         border: 1px solid rgba(76, 175, 80, 0.5);
     }
     
-    /* Highlighted Keywords - Purple theme */
+    /* ONLY Matched Keywords - Purple theme */
     .keyword-tag.highlight {
         background: rgba(156, 39, 176, 0.2);
         color: #BA68C8;
@@ -292,40 +292,30 @@ def display_resume_grid(resumes, container=None):
                         for exp in experience[:3]:  # Limit to 3 experiences
                             html += f'<div class="resume-experience">{exp}</div>'
                     
-                    # Add skills section - Show skills with highlighting
+                    # Add skills section - Show ALL skills with highlighting
                     if skills:
                         html += f'<div class="resume-section-title">🚀 Skills</div><div>'
                         
-                        # Show first 10 skills with highlighting
-                        skills_to_show = skills[:10]
-                        for skill in skills_to_show:
+                        # Show ALL skills with highlighting
+                        for skill in skills:
                             skill_name = skill if isinstance(skill, str) else skill.get('skillName', '')
                             # Check if this skill should be highlighted
                             is_highlight = any(term.lower() in skill_name.lower() for term in highlight_terms)
                             highlight_class = ' highlight' if is_highlight else ''
                             html += f'<span class="skill-tag{highlight_class}">{skill_name}</span>'
                         
-                        # Show count of remaining skills
-                        if len(skills) > 10:
-                            html += f'<span class="more-items">+{len(skills) - 10} more</span>'
-                        
                         html += '</div>'
                     
-                    # Add keywords section - Show keywords with highlighting
+                    # Add keywords section - Show ALL keywords with highlighting
                     if keywords:
                         html += f'<div class="resume-section-title">🏷️ Keywords</div><div>'
                         
-                        # Show first 8 keywords with highlighting
-                        keywords_to_show = keywords[:8]
-                        for keyword in keywords_to_show:
+                        # Show ALL keywords with highlighting
+                        for keyword in keywords:
                             # Check if this keyword should be highlighted
                             is_highlight = any(term.lower() in keyword.lower() for term in highlight_terms)
                             highlight_class = ' highlight' if is_highlight else ''
                             html += f'<span class="keyword-tag{highlight_class}">{keyword}</span>'
-                        
-                        # Show count of remaining keywords
-                        if len(keywords) > 8:
-                            html += f'<span class="more-items">+{len(keywords) - 8} more</span>'
                         
                         html += '</div>'
                     
