@@ -103,7 +103,7 @@ def display_resume_grid(resumes, container=None):
     rows = (num_resumes + 2) // 3  # Ceiling division for number of rows
     
     for row in range(rows):
-        cols = target.columns(3)
+        cols = target.columns(4)
         for col in range(3):
             idx = row * 3 + col
             if idx < num_resumes:
